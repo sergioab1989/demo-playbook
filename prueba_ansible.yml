@@ -11,4 +11,4 @@
       status_code: [200]
       method: GET
       validate_certs: no
-    register: register
+    register: register_out
