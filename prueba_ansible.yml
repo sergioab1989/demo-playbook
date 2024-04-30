@@ -15,7 +15,7 @@
 
   - name: imp vars
     debug:
-      msg: "{{ register_out.json.results }}"
+      msg: "{{ item.name }}"
     with_items: "{{ register_out.json.results }}"
 
   # - name: add project
