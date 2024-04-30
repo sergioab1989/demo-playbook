@@ -13,7 +13,7 @@
       validate_certs: no
     register: register_out
 
-  - name: imp_vars
+  - name: imp vars
     debug:
       msg: "{{ item.name }}"
     whit_items: register_out.json.results
