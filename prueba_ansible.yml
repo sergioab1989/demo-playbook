@@ -1,6 +1,14 @@
 ---
-- name: pruebas de implementacion de ansible
-  hosts: all
-  gather_facts: false  
-  roles:
-    - healthcheck
+- name: obtener proyectos
+  hosts: localhost
+  tasks: 
+
+  - name: get hosts
+    uri:
+      url: http://192.168.18.248/api/v2/projects/
+      headers:
+        Authorization: 'Basic YWRtaW46cGFzc3dvcmQ='
+      status_code: [200]
+      method: GET
+      validate_certs: no
+    register: register
