@@ -12,3 +12,33 @@
       method: GET
       validate_certs: no
     register: register_out
+
+  - name: add project
+    uri:
+      url: https://192.168.18.248/api/v2/organizations/1/projects/
+      headers:
+            Authorization: 'Basic YWRtaW46cGFzc3dvcmQ='
+      status_code: [200, 201]
+      method: POST
+      body_format: json
+      body:
+        {
+          "allow_override": false,
+          "credential": null,
+          "default_environment": null,
+          "description": "",
+          "name": "demo",
+          "organization": 1,
+          "scm_branch": "",
+          "scm_clean": false,
+          "scm_delete_on_update": false,
+          "scm_refspec": "",
+          "scm_track_submodules": false,
+          "scm_type": "git",
+          "scm_update_cache_timeout": 0,
+          "scm_update_on_launch": true,
+          "scm_url": "https://github.com/sergioab1989/demo-playbook.git",
+          "signature_validation_credential": null,
+          "timeout": 0
+        }      
+      validate_certs: no    
