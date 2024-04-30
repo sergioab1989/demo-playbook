@@ -16,7 +16,7 @@
   - name: imp_vars
     debug:
       msg: {{ item.name }}
-    whit_items: {{ register_out.json.results }}
+    whit_items: register_out.json.results
 
   # - name: add project
   #   uri:
