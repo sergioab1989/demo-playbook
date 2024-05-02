@@ -27,3 +27,5 @@
       - "RAM Total: {{ ram_total.stdout }}"
       - "Disk Space Used: {{ disk_space.stdout }}"
       - "Linux Version: {{ version_rhel.stdout }}"
+      - "Encuesta demo1: {{ var1 }}"
+      - "Encuesta demo2: {{ var2}}"
