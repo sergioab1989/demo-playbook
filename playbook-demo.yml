@@ -1,6 +1,6 @@
 ---
 - name: pruebas de implementacion de ansible
   hosts: all
-  gather_facts: false  
+  gather_facts: true
   roles:
     - healthcheck
