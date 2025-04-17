@@ -8,3 +8,11 @@
     - name: prueba
       debug:
         msg: "Hola Mundo"
+        
+    - name: ubicacion playbooks
+      command: "pwd;ls -l"
+      register: localiza
+
+    - name: mostrar ubicacion
+      debug:
+        msg: "{{ localiza }}"      
