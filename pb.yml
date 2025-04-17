@@ -1,0 +1,14 @@
+---
+- name: pruebas de implementacion de ansible
+  hosts: localhost
+  gather_facts: true
+
+  tasks:
+
+    - name: mostar variable heredada
+      debug:
+        msg: "{{ localiza_heredado }}"
+
+    - name: mostar variable local
+      debug:
+        msg: "{{ localiza }}"
