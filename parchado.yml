@@ -1,0 +1,223 @@
+---
+- name: Gestionar snapshots y actualizar RHEL (solo si hay updates), generando reporte
+  hosts: "{{ target_group }}"
+  gather_facts: true
+  become: true
+
+  vars:
+    # Diccionario de alias para servicios
+    service_map:
+      jboss: "eap7-domain"
+
+    servicios_lista: "{{ servicios_a_verificar | from_yaml }}"
+    report_path: "/tmp/update_report_{{ ansible_date_time.date }}.adoc"
+    pdf_path: "/tmp/update_report_{{ ansible_date_time.date }}.pdf"
+
+    email_recipients:
+      - "sordonez@bancointernacional.ec"
+      - "fvalenzu@redhat.com"
+
+    # Variables para Azure (se pueden solicitar por encuesta)
+    azure_resource_group: "{{ azure_resource_group }}"
+    azure_location: "{{ azure_location }}"
+
+  tasks:
+    ########################################################################
+    # 1) Recopilar Facts
+    ########################################################################
+    - name: Recopilar información del sistema
+      ansible.builtin.setup:
+
+    ########################################################################
+    # 2) Verificar si hay actualizaciones pendientes
+    ########################################################################
+    - name: Verificar actualizaciones (RHEL7)
+      ansible.builtin.yum:
+        list: updates
+      when: ansible_distribution_major_version == "7"
+      register: check_rhel7
+      ignore_errors: true
+      changed_when: false
+      failed_when: false
+
+    - name: Verificar actualizaciones (RHEL8 y 9)
+      ansible.builtin.dnf:
+        list: updates
+      when: ansible_distribution_major_version in ["8", "9"]
+      register: check_rhel8_9
+      ignore_errors: true
+      changed_when: false
+      failed_when: false
+
+    ########################################################################
+    # 3) Unificar resultado en "check_update_result"
+    ########################################################################
+    - name: Unificar resultado de verificación de updates
+      ansible.builtin.set_fact:
+        check_update_result: "{{ check_rhel7 if check_rhel7 is defined else check_rhel8_9 }}"
+      when: check_rhel7 is defined or check_rhel8_9 is defined
+
+    ########################################################################
+    # 4) Determinar si hay paquetes pendientes
+    ########################################################################
+    - name: Definir variable "updates_available"
+      ansible.builtin.set_fact:
+        updates_available: >-
+          {{
+            (check_update_result.get('results', []) | length > 0)
+            or (check_update_result.get('stdout_lines', []) | length > 0)
+          }}
+      when: check_update_result is defined
+
+
+    - name: Iniciar sesión en Azure CLI usando Service Principal
+      ansible.builtin.command: >
+        /usr/bin/az login --service-principal
+        -u "{{ lookup('env','AZURE_CLIENT_ID') }}"
+        -p "{{ lookup('env','AZURE_SECRET') }}"
+        --tenant "{{ lookup('env','AZURE_TENANT') }}"
+      register: azure_login
+      delegate_to: localhost
+      changed_when: false
+
+    - name: Mostrar resultado del login
+      ansible.builtin.debug:
+        var: azure_login.stdout
+
+
+    - name: Obtener información completa de la VM (instanceView) usando Azure CLI
+      ansible.builtin.command: >
+        /usr/bin/az vm get-instance-view --name "{{ inventory_hostname }}"
+        --resource-group "{{ azure_resource_group }}" --output json
+      register: cli_vm_info
+      delegate_to: localhost
+      changed_when: false
+
+    - name: Depurar información obtenida de la VM
+      ansible.builtin.debug:
+        msg: "{{ cli_vm_info.stdout | from_json }}"
+
+    - name: Extraer uri
+      ansible.builtin.set_fact:
+        uri: "{{ (cli_vm_info.stdout | from_json)['storageProfile']['osDisk']['managedDisk']['id'] }}"
+
+    - name: Mostrar uri
+      ansible.builtin.debug:
+        var: uri
+
+    - name: Crear snapshot
+      azure.azcollection.azure_rm_snapshot:
+        subscription_id: "{{ lookup('env','AZURE_SUBSCRIPTION_ID') }}"
+        client_id: "{{ lookup('env','AZURE_CLIENT_ID') }}"
+        secret: "{{ lookup('env','AZURE_SECRET') }}"
+        tenant: "{{ lookup('env','AZURE_TENANT') }}"
+        resource_group: "{{ azure_resource_group }}"
+        name: "parchado-{{ inventory_hostname }}-{{ ansible_date_time.date | replace('-', '') }}"
+        creation_data:
+          create_option: Copy
+          source_id: "{{ uri }}"
+      register: snapshot_results
+      delegate_to: localhost
+
+    - name: Depurar información del snapshot
+      ansible.builtin.debug:
+        var: snapshot_results
+    ########################################################################
+    # 8) Registrar fecha de creación del snapshot si se creó
+    ########################################################################
+    - name: Registrar fecha de creación del snapshot
+      ansible.builtin.set_fact:
+        snapshot_creation_date: "{{ ansible_date_time.date }}"
+        snapshot_description: "{{ snapshot_results.id }}"
+      when: snapshot_results is defined and snapshot_results.changed
+
+    - name: Asignar 'N/A' si no hubo snapshot o falló
+      ansible.builtin.set_fact:
+        snapshot_creation_date: "N/A"
+        snapshot_description: "N/A"
+      when: snapshot_results is not defined or not snapshot_results.changed
+
+    ########################################################################
+    # 9) Actualizar SOLO si hay updates
+    ########################################################################
+    - name: Actualizar RHEL 7 con Yum
+      ansible.builtin.yum:
+        update_cache: true
+        name: "*"
+        state: latest
+      when: ansible_distribution_major_version == "7" and updates_available | default(false)
+      register: update_rhel7
+      ignore_errors: true
+      failed_when: false
+      changed_when: >
+        update_rhel7.results is defined
+        and update_rhel7.results | length > 0
+
+    - name: Actualizar RHEL 8 y 9 con DNF
+      ansible.builtin.dnf:
+        update_cache: true
+        name: "*"
+        state: latest
+      when: ansible_distribution_major_version in ["8", "9"] and updates_available | default(false)
+      register: update_rhel8_9
+      ignore_errors: true
+      failed_when: false
+      changed_when: >
+        update_rhel8_9.results is defined
+        and update_rhel8_9.results | length > 0
+
+    - name: Unificar resultado final de update
+      ansible.builtin.set_fact:
+        update_result: "{{ update_rhel7 if update_rhel7 is defined else update_rhel8_9 }}"
+      when: update_rhel7 is defined or update_rhel8_9 is defined
+
+    ########################################################################
+    # 10) Reiniciar si update_result.changed = true
+    ########################################################################
+    - name: Reiniciar la VM tras actualización
+      ansible.builtin.reboot:
+        pre_reboot_delay: 10
+        reboot_timeout: 600
+        msg: "Reinicio tras actualización"
+      when: update_result is defined and update_result.changed | default(false)
+
+    ########################################################################
+    # 11) Manejo de servicios
+    ########################################################################
+    - name: Generar lista de servicios con alias
+      ansible.builtin.set_fact:
+        expanded_services: "{{ expanded_services | default([]) + [ { 'alias': item, 'real': (service_map[item] if item in service_map else item) } ] }}"
+      loop: "{{ servicios_lista }}"
+      when: servicios_lista | length > 0
+
+    - name: Verificar estado de cada servicio real
+      ansible.builtin.command:
+        cmd: "systemctl is-active {{ item.real }}"
+      register: service_status
+      loop: "{{ expanded_services }}"
+      ignore_errors: true
+
+    - name: Inicializar lista de resultados de servicios
+      ansible.builtin.set_fact:
+        service_results: []
+
+    - name: Añadir resultados de la verificación de servicios
+      ansible.builtin.set_fact:
+        service_results: "{{ service_results + [ { 'alias': item.item.alias, 'real': item.item.real, 'rc': item.rc, 'stdout': item.stdout | default(''), 'stderr': item.stderr | default('') } ] }}"
+      loop: "{{ service_status.results | default([]) }}"
+      when: service_status is defined
+
+    ########################################################################
+    # 12) Generar reporte AsciiDoc y PDF
+    ########################################################################
+    - name: Generar reporte AsciiDoc en localhost
+      ansible.builtin.template:
+        src: "report_template.adoc.j2"
+        dest: "{{ report_path }}"
+      delegate_to: localhost
+
+    - name: Convertir AsciiDoc a PDF
+      ansible.builtin.command:
+        cmd: "asciidoctor-pdf -a pdf-fontsdir=files/inputs/fonts -a pdf-theme=files/custom-theme.yml {{ report_path }} -o {{ pdf_path }}"
+      delegate_to: localhost
+      ignore_errors: true
