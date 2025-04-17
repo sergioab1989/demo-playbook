@@ -10,7 +10,7 @@
         msg: "Hola Mundo"
         
     - name: ubicacion playbooks
-      command: "pwd;ls -l"
+      shell: "pwd;ls -l"
       register: localiza
 
     - name: mostrar ubicacion
