@@ -2,7 +2,6 @@
 - name: Gestionar snapshots y actualizar RHEL (solo si hay updates), generando reporte
   hosts: "{{ target_group }}"
   gather_facts: true
-  become: true
 
   vars:
     # Diccionario de alias para servicios
@@ -74,6 +73,7 @@
         --tenant "{{ lookup('env','AZURE_TENANT') }}"
       register: azure_login
       delegate_to: localhost
+      run_once: true
       changed_when: false
 
     - name: Mostrar resultado del login
