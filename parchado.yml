@@ -83,7 +83,7 @@
 
     - name: Obtener información completa de la VM (instanceView) usando Azure CLI
       ansible.builtin.command: >
-        az vm get-instance-view --name "{{ inventory_hostname }}"
+        /usr/local/bin/az vm get-instance-view --name "{{ inventory_hostname }}"
         --resource-group "{{ azure_resource_group }}" --output json
       register: cli_vm_info
       delegate_to: localhost
