@@ -13,13 +13,9 @@
     report_path: "/tmp/update_report_{{ ansible_date_time.date }}.adoc"
     pdf_path: "/tmp/update_report_{{ ansible_date_time.date }}.pdf"
 
-    email_recipients:
-      - "sordonez@bancointernacional.ec"
-      - "fvalenzu@redhat.com"
-
     # Variables para Azure (se pueden solicitar por encuesta)
     azure_resource_group: "{{ azure_resource_group }}"
-    azure_location: "{{ azure_location }}"
+    azure_location: "{{ azure_location }}" ## East US = eastus
 
   tasks:
     ########################################################################
@@ -87,7 +83,7 @@
 
     - name: Obtener información completa de la VM (instanceView) usando Azure CLI
       ansible.builtin.command: >
-        /usr/bin/az vm get-instance-view --name "{{ inventory_hostname }}"
+        az vm get-instance-view --name "{{ inventory_hostname }}"
         --resource-group "{{ azure_resource_group }}" --output json
       register: cli_vm_info
       delegate_to: localhost
@@ -105,6 +101,10 @@
       ansible.builtin.debug:
         var: uri
 
+    - name: Registrar fecha de creación del snapshot
+      ansible.builtin.set_fact:
+        snapshot_name: "parchado-{{ inventory_hostname }}-{{ ansible_date_time.date | replace('-', '') }}"
+
     - name: Crear snapshot
       azure.azcollection.azure_rm_snapshot:
         subscription_id: "{{ lookup('env','AZURE_SUBSCRIPTION_ID') }}"
@@ -112,7 +112,7 @@
         secret: "{{ lookup('env','AZURE_SECRET') }}"
         tenant: "{{ lookup('env','AZURE_TENANT') }}"
         resource_group: "{{ azure_resource_group }}"
-        name: "parchado-{{ inventory_hostname }}-{{ ansible_date_time.date | replace('-', '') }}"
+        name: "{{ snapshot_name }}"
         creation_data:
           create_option: Copy
           source_id: "{{ uri }}"
@@ -221,3 +221,19 @@
         cmd: "asciidoctor-pdf -a pdf-fontsdir=files/inputs/fonts -a pdf-theme=files/custom-theme.yml {{ report_path }} -o {{ pdf_path }}"
       delegate_to: localhost
       ignore_errors: true
+
+    - name: Copiar reporte AsciiDoc a los hosts objetivo
+      ansible.builtin.copy:
+        src: "{{ report_path }}"
+        dest: "/tmp/update_report.adoc"
+      delegate_to: localhost
+      run_once: true
+      when: report_path is defined
+
+    - name: Copiar reporte PDF a los hosts objetivo
+      ansible.builtin.copy:
+        src: "{{ pdf_path }}"
+        dest: "/tmp/update_report.pdf"
+      delegate_to: localhost
+      run_once: true
+      when: pdf_path is defined
