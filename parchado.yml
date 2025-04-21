@@ -216,11 +216,11 @@
         dest: "{{ report_path }}"
       delegate_to: localhost
 
-    - name: Convertir AsciiDoc a PDF
-      ansible.builtin.command:
-        cmd: "asciidoctor-pdf -a pdf-fontsdir=files/inputs/fonts -a pdf-theme=files/custom-theme.yml {{ report_path }} -o {{ pdf_path }}"
-      delegate_to: localhost
-      ignore_errors: true
+    # - name: Convertir AsciiDoc a PDF
+    #   ansible.builtin.command:
+    #     cmd: "asciidoctor-pdf -a pdf-fontsdir=files/inputs/fonts -a pdf-theme=files/custom-theme.yml {{ report_path }} -o {{ pdf_path }}"
+    #   delegate_to: localhost
+    #   ignore_errors: true
 
     - name: Copiar reporte AsciiDoc a los hosts objetivo
       ansible.builtin.copy:
@@ -230,10 +230,10 @@
       run_once: true
       when: report_path is defined
 
-    - name: Copiar reporte PDF a los hosts objetivo
-      ansible.builtin.copy:
-        src: "{{ pdf_path }}"
-        dest: "/tmp/update_report.pdf"
-      delegate_to: localhost
-      run_once: true
-      when: pdf_path is defined
+    # - name: Copiar reporte PDF a los hosts objetivo
+    #   ansible.builtin.copy:
+    #     src: "{{ pdf_path }}"
+    #     dest: "/tmp/update_report.pdf"
+    #   delegate_to: localhost
+    #   run_once: true
+    #   when: pdf_path is defined
