@@ -1,0 +1,65 @@
+= Reporte de Actualización de Servidores
+Autor: Equipo de Automatización de Red Hat
+Fecha: {{ ansible_date_time.date }}
+Versión del Reporte: 1.0
+
+== Resumen General
+
+* Total de Hosts: {{ ansible_play_hosts | length }}
+* Hosts Actualizados: {{ ansible_play_hosts | selectattr('hostvars[host].update_result.changed', 'defined') | selectattr('hostvars[host].update_result.changed', 'equalto', true) | list | length }}
+* Hosts Sin Actualizaciones: {{ ansible_play_hosts | selectattr('hostvars[host].update_result.changed', 'defined') | selectattr('hostvars[host].update_result.changed', 'equalto', false) | list | length }}
+
+== Detalles por Host
+
+{% for host in ansible_play_hosts %}
+=== {{ host }}
+
+==== Información del Host
+[cols="2,4",options="header,autowidth"]
+|===
+| Campo | Detalle
+| IP | {{ hostvars[host]['ansible_default_ipv4']['address'] | default('N/A') }}
+| Sistema Operativo | {{ hostvars[host]['ansible_distribution'] | default('N/A') }} {{ hostvars[host]['ansible_distribution_version'] | default('N/A') }}
+| Versión del Kernel | {{ hostvars[host]['ansible_kernel'] | default('N/A') }}
+| Uptime | {{ hostvars[host]['ansible_uptime_seconds'] | default(0) // 86400 }} días
+|===
+
+==== Detalles del Snapshot
+[cols="2,4",options="header,autowidth"]
+|===
+| Campo | Detalle
+| Nombre del Snapshot | {{ hostvars[host]['snapshot_name'] | default('N/A') }}
+| Descripción | {{ hostvars[host]['snapshot_description'] | default('N/A') }}
+| Fecha de Creación | {{ hostvars[host]['snapshot_creation_date'] | default('N/A') }}
+|===
+
+==== Detalles de Actualización
+[cols="2,4",options="header,autowidth"]
+|===
+| Campo | Detalle
+| Estado |
+{% set ur = hostvars[host]['update_result'] | default({}) %}
+{% if ur.changed | default(false) %}
+Actualización realizada
+{% elif ur.rc | default(0) != 0 %}
+Error en la actualización (rc={{ ur.rc | default('?') }})
+{% else %}
+Sin actualizaciones disponibles
+{% endif %}
+|===
+
+==== Servicios Verificados
+[cols="2,2",options="header,autowidth"]
+|===
+| Servicio | Estado
+
+{% set services = hostvars[host]['service_results'] | default([]) %}
+{% if services | length > 0 %}
+{% for svc in services %}
+| {{ svc['alias'] }} | {{ svc['stdout'] | default('error') }}
+{% endfor %}
+{% else %}
+| N/A | No se verificaron servicios
+{% endif %}
+|===
+{% endfor %}

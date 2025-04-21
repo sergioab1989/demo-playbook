@@ -16,12 +16,3 @@
     - name: mostrar ubicacion
       debug:
         msg: "{{ localiza }}"
-
-    - name: mostrar ubicacion
-      debug:
-        msg: "{{ localiza }}"
-
-    - name: Heredar variable
-      ansible.builtin.set_stats:
-        data:
-          localiza_heredado: "{{ localiza }}"
