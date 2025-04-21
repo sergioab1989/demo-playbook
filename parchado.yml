@@ -224,13 +224,13 @@
 
     - name: ver contenido de archivo
       command: "cat {{ report_path }}"
-      register: adoc.cont
+      register: adoc_cont
       delegate_to: localhost
       when: report_path is defined
 
     - name: ver contenido de archivo
       debug:
-        msg: "{{ adoc.cont }}"
+        msg: "{{ adoc_cont }}"
       delegate_to: localhost
       when: report_path is defined
 
