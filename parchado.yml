@@ -222,12 +222,23 @@
     #   delegate_to: localhost
     #   ignore_errors: true
 
+    - name: ver contenido de archivo
+      command: "cat {{ report_path }}"
+      register: adoc.cont
+      delegate_to: localhost
+      when: report_path is defined
+
+    - name: ver contenido de archivo
+      debug:
+        msg: "{{ adoc.cont }}"
+      delegate_to: localhost
+      when: report_path is defined
+
     - name: Copiar reporte AsciiDoc a los hosts objetivo
       ansible.builtin.copy:
         src: "{{ report_path }}"
         dest: "/tmp/update_report.adoc"
       delegate_to: localhost
-      run_once: true
       when: report_path is defined
 
     # - name: Copiar reporte PDF a los hosts objetivo
